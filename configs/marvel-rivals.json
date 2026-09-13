@@ -1,0 +1,48 @@
+{
+  "player_name": "Tunmun",
+  "detector": "marvel_rivals",
+  "ko_region": [
+    0.78,
+    0.41,
+    1.0,
+    0.57
+  ],
+  "ko_template": [
+    "calib/marvel-rivals/emblem.png",
+    "calib/marvel-rivals/emblem2.png"
+  ],
+  "ko_threshold": 0.75,
+  "same_word_gap": 8.0,
+  "banner_texts": {
+    "KO": "calib/marvel-rivals/ko.png",
+    "DOUBLE": "calib/marvel-rivals/double.png",
+    "TRIPLE": "calib/marvel-rivals/triple.png",
+    "QUAD": "calib/marvel-rivals/quad.png",
+    "PENTA": "calib/marvel-rivals/penta.png",
+    "HEXA": "calib/marvel-rivals/hexa.png"
+  },
+  "banner_text_threshold": 0.8,
+  "feed_region": [
+    0.76,
+    0.02,
+    0.985,
+    0.2
+  ],
+  "name_template": [
+    "calib/marvel-rivals/name.png",
+    "calib/marvel-rivals/name2.png",
+    "calib/marvel-rivals/name_death.png"
+  ],
+  "name_threshold": 0.8,
+  "attacker_min_right": 90,
+  "confirm_lead": 0.6,
+  "confirm_window": 1.5,
+  "scan_fps": 5,
+  "ocr_upscale": 3,
+  "audio_ref": null,
+  "merge_gap": 10.0,
+  "clip_pre": 8.0,
+  "clip_post": 5.0,
+  "history": 3.0,
+  "calib_height": 1088
+}

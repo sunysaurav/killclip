@@ -1,0 +1,14 @@
+{
+  "player_name": "heisenbreg-5",
+  "detector": "battlefield_6",
+  "calib_height": 1080,
+  "feed_region": [0.74, 0.08, 1.0, 0.22],
+  "name_template": ["calib/battlefield-6/name.png", "calib/battlefield-6/name2.png"],
+  "name_threshold": 0.75,
+  "attacker_min_right": 120,
+  "feed_settle": 2,
+  "scan_fps": 5,
+  "merge_gap": 10.0,
+  "clip_pre": 8.0,
+  "clip_post": 5.0
+}
