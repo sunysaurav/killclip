@@ -3,17 +3,17 @@ import logging
 import subprocess
 import time
 
-from . import grade as grading
+from . import encode, grade as grading
 from .media import probe
 
 log = logging.getLogger("killclip.cut")
 
-ENCODE = ["-c:v", "h264_videotoolbox", "-pix_fmt", "yuv420p",
-          "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart"]
+bitrate_for = encode.bitrate_for      # kept here: tools/ and older callers import it from cut
 
 
-def bitrate_for(height):
-    return "40M" if height >= 2000 else "16M"
+def _encode_args(height):
+    """Video, audio and container flags for one output."""
+    return [*encode.video_args(height), *encode.audio_args(), *encode.container_args()]
 
 
 def cut_clip(video, start, end, out, info, vertical=False, grade="none"):
@@ -22,7 +22,7 @@ def cut_clip(video, start, end, out, info, vertical=False, grade="none"):
     if vertical:  # centre crop to 9:16, then 1080x1920
         vf += "crop=ih*9/16:ih:(iw-ih*9/16)/2:0,scale=1080:1920,"
     cmd += ["-vf", vf + grading.stamp(info, grade)]                 # the frames carry the colour tags the encoder writes
-    cmd += ["-b:v", bitrate_for(info["height"]), *ENCODE, *grading.tags(info, grade), str(out)]
+    cmd += [*_encode_args(info["height"]), *grading.tags(info, grade), str(out)]
     run(cmd, f"clip {start:.2f}-{end:.2f}s -> {out}")
 
 
@@ -74,5 +74,5 @@ def montage(clips, out, fade=0.5):
         v_prev, a_prev = f"[v{i}]", f"[a{i}]"
     if parts:
         cmd += ["-filter_complex", ";".join(parts), "-map", v_prev, "-map", a_prev]
-    cmd += ["-b:v", bitrate_for(infos[0]["height"]), *ENCODE, *grading.tags(infos[0]), str(out)]   # clips are already graded
+    cmd += [*_encode_args(infos[0]["height"]), *grading.tags(infos[0]), str(out)]   # clips are already graded
     run(cmd, f"montage of {len(clips)} clips -> {out}")

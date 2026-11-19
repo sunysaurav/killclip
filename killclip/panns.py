@@ -45,7 +45,14 @@ def weights_path():
 
 
 def labels_path():
-    return os.path.join(HOME, "calib", "audio", "audioset_labels.csv")
+    """The AudioSet class list. Bundled with the package; a copy under the killclip home wins, so a
+    user can substitute one. It used to be fetched over plain HTTP with no checksum, and since
+    sound.listen() maps group names onto output indices by position, a tampered list would silently
+    point the detector at the wrong classes."""
+    local = os.path.join(HOME, "calib", "audio", "audioset_labels.csv")
+    if os.path.exists(local):
+        return local
+    return os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "audioset_labels.csv")
 
 
 def _fetch(url, dest, md5=None):
@@ -66,7 +73,7 @@ def labels():
     if _labels is None:
         p = labels_path()
         if not os.path.exists(p):
-            _fetch(LABELS_URL, p)
+            _fetch(LABELS_URL, p)      # only reachable if the bundled copy was removed
         with open(p) as f:
             _labels = [row["display_name"] for row in csv.DictReader(f)]
     return _labels

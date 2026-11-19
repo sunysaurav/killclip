@@ -1,10 +1,13 @@
 """ffmpeg / ffprobe helpers."""
 import json
 import logging
+import os
 import subprocess
 import time
 
 import numpy as np
+
+from . import encode
 
 log = logging.getLogger("killclip.media")
 SR = 16000  # sample rate used for all audio analysis
@@ -22,6 +25,8 @@ def probe(path):
         "height": int(v["height"]),
         "fps": float(num) / float(den),
         "duration": float(info["format"]["duration"]),
+        "codec": v.get("codec_name"),
+        "pix_fmt": v.get("pix_fmt"),
         "has_audio": any(s["codec_type"] == "audio" for s in info["streams"]),
         "hdr": v.get("color_transfer") in ("smpte2084", "arib-std-b67"),   # PQ or HLG recording
         "color": {k: v.get(k) for k in ("color_primaries", "color_transfer", "color_space", "color_range")},
@@ -47,6 +52,17 @@ def region_px(region, width, height):
     return even(x0 * width), even(y0 * height), even(x1 * width), even(y1 * height)
 
 
+def _codec(path, hwaccel):
+    """The video codec, so the hwaccel policy can refuse one it has no hardware path for. Only looked
+    up when a hardware decoder was actually asked for, since it costs an ffprobe."""
+    if hwaccel is False or not os.environ.get("KILLCLIP_HWACCEL", "").strip(" none0"):
+        return None
+    try:
+        return probe(path).get("codec")
+    except Exception:
+        return None
+
+
 def scaled(width, height, calib_height=None):
     """The frame size the templates were cut at: (width, height, ffmpeg scale step or ''). A 4K
     recording is scanned at the calibration height so the 1080p templates still fit."""
@@ -56,22 +72,24 @@ def scaled(width, height, calib_height=None):
     return w, calib_height, f"scale={w}:{calib_height},"
 
 
-def iter_crops(path, region, fps, width, height, hwaccel=True, start=None, dur=None, calib_height=None):
+def iter_crops(path, region, fps, width, height, hwaccel=None, start=None, dur=None, calib_height=None):
     """Yield (t, gray uint8 array) of the region, sampled at `fps` frames per second.
-    t is relative to `start` when a window is given."""
+    t is relative to `start` when a window is given.
+
+    Decoding is in software. That is the fast path, not a fallback: measured over 30 s at 5 fps on an
+    M5 Pro, 4K VP9 took 9.93 s with `-hwaccel videotoolbox` and 3.68 s without, and 1080p H.264 took
+    6.01 s against 0.96 s. Set $KILLCLIP_HWACCEL to ask for one anyway."""
     width, height, sc = scaled(width, height, calib_height)
     x0, y0, x1, y1 = region_px(region, width, height)
     w, h = x1 - x0, y1 - y0
-    cmd = ["ffmpeg", "-v", "error"]
-    if hwaccel:
-        cmd += ["-hwaccel", "videotoolbox"]
+    cmd = ["ffmpeg", "-v", "error", *encode.hwaccel_args(_codec(path, hwaccel))]
     if start is not None:
         cmd += ["-ss", f"{start:.4f}"]
     cmd += ["-i", str(path)]
     if dur is not None:
         cmd += ["-t", f"{dur:.4f}"]
     cmd += ["-vf", f"fps={fps},{sc}crop={w}:{h}:{x0}:{y0}", "-f", "rawvideo", "-pix_fmt", "gray", "-"]
-    log.debug("iter_crops: region %dx%d at (%d,%d), %s fps, hwaccel=%s", w, h, x0, y0, fps, hwaccel)
+    log.debug("iter_crops: region %dx%d at (%d,%d), %s fps", w, h, x0, y0, fps)
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     n = 0
     while True:
@@ -82,10 +100,7 @@ def iter_crops(path, region, fps, width, height, hwaccel=True, start=None, dur=N
         n += 1
     err = proc.stderr.read().decode()
     proc.wait()
-    if n == 0 and hwaccel:  # decoder refused hardware decoding: retry in software
-        log.info("hardware decoding produced no frames, retrying in software (%s)", err.strip())
-        yield from iter_crops(path, region, fps, width, height, hwaccel=False, start=start, dur=dur)   # already scaled dims
-    elif n == 0:
+    if n == 0:
         log.error("ffmpeg produced no frames: %s", err.strip())
         raise RuntimeError(f"ffmpeg produced no frames: {err}")
     else:

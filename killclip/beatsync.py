@@ -19,8 +19,9 @@ import tempfile
 import numpy as np
 from scipy.signal import correlate, stft
 
-from . import grade as grading, media
-from .cut import bitrate_for, ENCODE
+from . import grade as grading, media, paths
+from . import encode
+from .cut import bitrate_for
 
 log = logging.getLogger("killclip.beatsync")
 SR = 22050
@@ -187,7 +188,7 @@ def effect_filters(effect, hits, width, height):
     raise ValueError(f"unknown effect {effect!r}; use one of {EFFECTS}")
 
 
-def render_slot(video, width, height, src_start, parts, out, frames, effect=None, hits=(), pre="", tags=(), stamp="null"):
+def render_slot(video, width, height, src_start, parts, out, frames, effect=None, hits=(), pre="", tags=(), stamp="null", venc=None):
     """One slot: the parts [(source seconds, output seconds)] back to back, exactly `frames`
     frames, with the on-beat effect on the output frames `hits`; `pre` is the colour chain applied first."""
     n = len(parts)
@@ -206,7 +207,8 @@ def render_slot(video, width, height, src_start, parts, out, frames, effect=None
     # seek half a source frame early: the first decoded frame is the first one at or after the seek point,
     # so this lands it within half a frame of src_start instead of up to a frame late
     cmd = ["ffmpeg", "-v", "error", "-y", "-ss", f"{max(0.0, src_start - 1 / 120):.4f}", "-i", str(video), "-t", f"{t + 0.5:.4f}",
-           "-filter_complex", graph, "-map", "[v]", "-an", "-frames:v", str(frames), "-b:v", bitrate_for(height), *ENCODE, *tags, str(out)]
+           "-filter_complex", graph, "-map", "[v]", "-an", "-frames:v", str(frames), *(venc or encode.video_args(height)), *encode.audio_args(),
+           *encode.container_args(), *tags, str(out)]
     r = subprocess.run(cmd, capture_output=True, text=True)
     if r.returncode:
         raise RuntimeError(r.stderr.strip())
@@ -234,34 +236,38 @@ def build(video, events, music, out, beats_per_kill=4, kill_at=None, pattern=Non
     slots = plan(events, times, beats_per_kill, kill_at, st, start_beat, streak_gap)
     if not slots:
         raise SystemExit("no kills fit the music")
-    tmp = tempfile.mkdtemp()
-    parts = []
-    music_start = slots[0]["start"]                                   # output 0 = first slot start on the music timeline
-    done = 0                                                          # frames rendered so far
-    log.info("style %s: lead/fast %s, tail %s, hold %s beat(s), effect %s, kill at %.2f of the slot",
-             style, st["pattern"], st["tail"], st["hold"], st["effect"], kill_at)
-    for n, s in enumerate(slots):
-        p = os.path.join(tmp, f"slot{n:03d}.mp4")
-        frames = int(round((s["end"] - music_start) * FPS)) - done    # exact count: no drift against the music
-        hits = [int(round((b - s["start"]) * FPS)) for _, b in s["kills"]]
-        info = infos[s["video"]]
-        render_slot(s["video"], info["width"], info["height"], s["src_start"], s["parts"], p, frames, st["effect"], hits,
-                    grading.filters(info, grade), grading.tags(info, grade), grading.stamp(info, grade))
-        done += frames
-        parts.append(p)
-        log.info("slot %2d: %d kill%s at %s on beats %s; parts %s  [%s]", n, len(s["kills"]), "s" if len(s["kills"]) > 1 else "",
-                 " ".join(f"{k:.2f}s" for k, _ in s["kills"]), " ".join(f"{b:.2f}s" for _, b in s["kills"]),
-                 " ".join(f"hold {d:.2f}s" if src == 0 else f"{src:.2f}s@{src / d:.2f}x" for src, d in s["parts"]),
-                 os.path.basename(s["video"]))
-    lst = os.path.join(tmp, "list.txt")
-    with open(lst, "w") as f:
-        f.writelines(f"file '{p}'\n" for p in parts)
-    video_only = os.path.join(tmp, "video.mp4")
-    subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "concat", "-safe", "0", "-i", lst, "-c", "copy", video_only], check=True)
-    total = done / FPS
-    cmd = ["ffmpeg", "-v", "error", "-y", "-i", video_only, "-ss", f"{music_start:.4f}", "-i", music, "-t", f"{total:.4f}",
-           "-map", "0:v", "-map", "1:a", "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", str(out)]
-    subprocess.run(cmd, check=True)
+    with paths.workdir("beatsync") as tmp:
+        parts = []
+        # One profile for every slot. pool() deliberately mixes recordings, and the slots are joined with
+        # -c copy below, so deriving the bitrate per slot from its own source gives a stream that changes
+        # parameters halfway through.
+        venc = encode.video_args(max(i["height"] for i in infos.values()))
+        music_start = slots[0]["start"]                                   # output 0 = first slot start on the music timeline
+        done = 0                                                          # frames rendered so far
+        log.info("style %s: lead/fast %s, tail %s, hold %s beat(s), effect %s, kill at %.2f of the slot",
+                 style, st["pattern"], st["tail"], st["hold"], st["effect"], kill_at)
+        for n, s in enumerate(slots):
+            p = os.path.join(tmp, f"slot{n:03d}.mp4")
+            frames = int(round((s["end"] - music_start) * FPS)) - done    # exact count: no drift against the music
+            hits = [int(round((b - s["start"]) * FPS)) for _, b in s["kills"]]
+            info = infos[s["video"]]
+            render_slot(s["video"], info["width"], info["height"], s["src_start"], s["parts"], p, frames, st["effect"], hits,
+                        grading.filters(info, grade), grading.tags(info, grade), grading.stamp(info, grade), venc)
+            done += frames
+            parts.append(p)
+            log.info("slot %2d: %d kill%s at %s on beats %s; parts %s  [%s]", n, len(s["kills"]), "s" if len(s["kills"]) > 1 else "",
+                     " ".join(f"{k:.2f}s" for k, _ in s["kills"]), " ".join(f"{b:.2f}s" for _, b in s["kills"]),
+                     " ".join(f"hold {d:.2f}s" if src == 0 else f"{src:.2f}s@{src / d:.2f}x" for src, d in s["parts"]),
+                     os.path.basename(s["video"]))
+        lst = os.path.join(tmp, "list.txt")
+        with open(lst, "w") as f:
+            f.writelines(f"file '{p}'\n" for p in parts)
+        video_only = os.path.join(tmp, "video.mp4")
+        subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "concat", "-safe", "0", "-i", lst, "-c", "copy", video_only], check=True)
+        total = done / FPS
+        cmd = ["ffmpeg", "-v", "error", "-y", "-i", video_only, "-ss", f"{music_start:.4f}", "-i", music, "-t", f"{total:.4f}",
+               "-map", "0:v", "-map", "1:a", "-c:v", "copy", *encode.audio_args(), *encode.container_args(), str(out)]
+        subprocess.run(cmd, check=True)
     kills = sum(len(s["kills"]) for s in slots)
     log.info("beat montage: %d kills in %d slots on beats at %.0f BPM, %.1fs -> %s", kills, len(slots), tempo, total, out)
     return slots, tempo

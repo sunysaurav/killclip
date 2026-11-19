@@ -5,7 +5,7 @@ import logging
 import os
 import time
 
-from . import audio, games, media
+from . import audio, games, media, ocr as ocrmod
 
 log = logging.getLogger("killclip.detect")
 from .paths import HOME as ROOT
@@ -74,6 +74,8 @@ def scan(video, cfg, info, ocr=True):
 
     A game module that finds its moments some other way (GTA listens to the audio) defines
     `candidates(video, cfg, info)` instead of a Detector, and that is used in its place."""
+    if ocr:
+        ocrmod.require()          # fail in a second, not after three minutes of decoding
     mod = games.load(cfg["detector"])
     if hasattr(mod, "candidates") and not hasattr(mod, "Detector"):
         t0 = time.perf_counter()

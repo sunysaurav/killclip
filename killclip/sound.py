@@ -26,6 +26,13 @@ BASELINE = 90           # seconds either side that set a sound's usual level her
 MIN_PROB = 0.10         # below this the tagger is not really hearing it
 MIN_REF = 0.20          # "as loud as it gets here" is never taken lower than this
 MERGE_SECONDS = 10      # a crash and the scramble after it are one moment
+EXTEND_SECONDS = 45     # how long an aftermath sound may keep an incident open
+
+# Sounds that begin an incident, and sounds that only mean one is still going. Gunfire starts a
+# fight; a siren on its own is just traffic, but a siren after gunfire is the chase you caused, and
+# that chase is the rest of the clip even though nothing is firing during it.
+STARTS = ("gunfire", "explosion", "crash", "scream")
+EXTENDS = ("siren", "engine")
 
 # AudioSet classes worth listening for, grouped. Names must match panns.labels() exactly.
 GROUPS = {
@@ -131,9 +138,14 @@ def strengths(heard, groups=None, weights=None):
     return out
 
 
-def moments(heard, groups=None, weights=None, threshold=0.3, merge=MERGE_SECONDS, limit=None):
-    """Ranked [{t, end, score, label, groups}] from what listen() heard. `threshold` is how strong
-    a sound must be, relative to this recording, to start a moment."""
+def moments(heard, groups=None, weights=None, threshold=0.3, merge=MERGE_SECONDS, limit=None,
+            starts=STARTS, extends=EXTENDS, extend_gap=EXTEND_SECONDS):
+    """Ranked [{t, end, score, label, groups}] from what listen() heard.
+
+    `threshold` is how strong a sound must be, relative to this recording, to count. Only `starts`
+    sounds open a moment; `extends` sounds (sirens, engines) keep an open one running, so a
+    gunfight and the police chase it causes come out as one clip instead of two with the quiet
+    getaway dropped in between."""
     groups = groups or GROUPS
     st = strengths(heard, groups, weights)
     runs = []
@@ -150,14 +162,25 @@ def moments(heard, groups=None, weights=None, threshold=0.3, merge=MERGE_SECONDS
             i = end + 1
     merged = []
     for lo, hi, g, peak in sorted(runs):
-        if merged and lo - merged[-1]["end"] <= merge:
+        gap = lo - merged[-1]["end"] if merged else None
+        # an aftermath sound gets a longer reach back, but only onto a moment something started
+        reach = merge if g in starts else (extend_gap if merged and merged[-1]["started"] else merge)
+        if merged and gap <= reach:
             m = merged[-1]
             m["end"] = max(m["end"], hi)
-            m["score"] = max(m["score"], peak)
             m["groups"][g] = max(m["groups"].get(g, 0.0), peak)
+            if g in starts:
+                m["score"] = max(m["score"], peak)
+                m["started"] = True
+        elif g in starts:
+            merged.append({"t": float(lo), "end": float(hi), "score": peak, "groups": {g: peak},
+                           "started": True})
         else:
-            merged.append({"t": float(lo), "end": float(hi), "score": peak, "groups": {g: peak}})
+            # a siren with no incident behind it is traffic; keep it, but it ranks on its own
+            merged.append({"t": float(lo), "end": float(hi), "score": peak * 0.6, "groups": {g: peak},
+                           "started": False})
     for m in merged:
+        m.pop("started", None)
         order = sorted(m["groups"], key=lambda g: -m["groups"][g])
         m["label"] = " + ".join(groups[g].get("label", g) for g in order)
     merged.sort(key=lambda m: -m["score"])

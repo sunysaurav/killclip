@@ -32,8 +32,8 @@ def burn(video, srt, out, height=None, font_frac=0.040, margin_frac=0.085):
     """Burn an SRT into a video without libass: each line is rendered to a transparent PNG and
     overlaid for its own time range. This ffmpeg build has no subtitles/ass/drawtext filter."""
     import re, subprocess, tempfile
-    from PIL import Image, ImageDraw, ImageFont
-    from killclip import media
+    from PIL import Image, ImageDraw
+    from killclip import encode, media
     info = media.probe(video); W, H = info["width"], info["height"]
 
     def secs(ts):
@@ -47,13 +47,9 @@ def burn(video, srt, out, height=None, font_frac=0.040, margin_frac=0.085):
         a_, b_ = lines[1].split(" --> ")
         cues.append((secs(a_), secs(b_), " ".join(l.strip() for l in lines[2:])))
 
-    size = max(16, int(H * font_frac))
-    for path in ("/System/Library/Fonts/Helvetica.ttc", "/System/Library/Fonts/Supplemental/Arial Bold.ttf"):
-        try:
-            font = ImageFont.truetype(path, size); break
-        except Exception:
-            font = None
-    font = font or ImageFont.load_default()
+    size = max(24, int(H * font_frac))
+    from killclip import fonts
+    font = fonts.resolve("body", size)
     tmp = tempfile.mkdtemp()
     pngs = []
     for i, (s, e, text) in enumerate(cues):
@@ -73,7 +69,7 @@ def burn(video, srt, out, height=None, font_frac=0.040, margin_frac=0.085):
         chain.append(f"{prev}[{i}:v]overlay=0:0:enable='between(t,{s:.3f},{e:.3f})'{tag}")
         prev = tag
     cmd += ["-filter_complex", ";".join(chain), "-map", prev, "-map", "0:a?",
-            "-c:v", "h264_videotoolbox", "-b:v", "40M" if H >= 2000 else "16M", "-pix_fmt", "yuv420p",
+            *encode.video_args(H),
             "-color_primaries", "bt709", "-color_trc", "bt709", "-colorspace", "bt709",
             "-c:a", "copy", "-movflags", "+faststart", str(out)]
     r = subprocess.run(cmd, capture_output=True, text=True)

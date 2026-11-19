@@ -3,11 +3,11 @@ import logging
 import os
 import time
 
-from .paths import HOME as ROOT
+from . import paths
 
 
 def setup(verbose=False, log_dir=None):
-    log_dir = log_dir or os.path.join(ROOT, "logs")
+    log_dir = log_dir or os.environ.get("KILLCLIP_LOG_DIR") or os.path.join(paths.home(), "logs")
     os.makedirs(log_dir, exist_ok=True)
     path = os.path.join(log_dir, time.strftime("killclip-%Y%m%d-%H%M%S.log"))
     root = logging.getLogger("killclip")

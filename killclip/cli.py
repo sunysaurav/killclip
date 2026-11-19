@@ -9,7 +9,7 @@ import sys
 import cv2
 import numpy as np
 
-from . import audio, beatsync, captions, cut, detect, games, log as logmod, media, short
+from . import audio, beatsync, captions, cut, detect, encode, fonts, games, log as logmod, media, ocr, panns, paths, short
 
 log = logging.getLogger("killclip.cli")
 
@@ -144,6 +144,54 @@ def cmd_short(a, cfg):
     print(f"{out}  ({len(cues)} caption lines, title {a.title!r})")
 
 
+def cmd_doctor(a, cfg):
+    """Everything this machine can and cannot do, in one pasteable block."""
+    import shutil
+    ok = True
+
+    def line(name, good, detail):
+        nonlocal ok
+        ok = ok and good
+        print(f"  {'ok  ' if good else 'FAIL'} {name:22s} {detail}")
+
+    print("killclip doctor")
+    for binary in ("ffmpeg", "ffprobe", "tesseract"):
+        line(binary, bool(shutil.which(binary)), shutil.which(binary) or "not on the PATH")
+    try:
+        caps = encode.caps()
+        line("ffmpeg version", True, caps["version"])
+        line("encoder", True, f"{encode.encoder()}  " + " ".join(encode.video_args(2160)))
+        missing = [f for f in ("boxblur", "eq", "lut3d", "zoompan", "xfade", "acrossfade", "tpad",
+                               "drawbox", "setparams", "overlay", "concat") if f not in caps["filters"]]
+        line("filters", not missing, "all present" if not missing else "missing " + ", ".join(missing))
+        line("hwaccel", True, (" ".join(encode.hwaccel_args()) or "off (software decode is faster here)"))
+    except encode.FfmpegError as e:
+        line("ffmpeg", False, str(e))
+    try:
+        ocr.require()
+        line("tesseract eng", True, "present")
+    except ocr.OcrError as e:
+        line("tesseract eng", False, str(e))
+    for role in ("display", "body"):
+        try:
+            f = fonts.resolve(role, 96)
+            line(f"font {role}", True, f"{os.path.basename(getattr(f, 'path', '?'))} at size {f.size}")
+        except fonts.FontError as e:
+            line(f"font {role}", False, str(e))
+    hm = paths.home()
+    line("home", os.access(hm, os.W_OK), f"{hm} ({'writable' if os.access(hm, os.W_OK) else 'NOT writable'})")
+    line("configs", os.path.isdir(os.path.join(hm, "configs")),
+         ", ".join(sorted(os.path.splitext(f)[0] for f in os.listdir(os.path.join(hm, "configs")))
+                   if os.path.isdir(os.path.join(hm, "configs")) else ["none found"]))
+    line("sound (GTA)", True, "torch present" if panns.available() else
+         "no torch: --game gta needs pip install 'killclip[sound]'")
+    if panns.available():
+        w = panns.weights_path()
+        line("sound weights", True, f"{w} ({'cached' if os.path.exists(w) else 'downloads on first use'})")
+    print("  " + ("everything the tool needs is present" if ok else "fix the FAIL lines above"))
+    return 0 if ok else 1
+
+
 def cmd_audio_ref(a, cfg):
     out = a.out or cfg["audio_ref"]
     if not out:
@@ -175,6 +223,7 @@ def main(argv=None):
     p.add_argument("--game", default=os.environ.get("KILLCLIP_GAME", "marvel-rivals"),
                    help="loads configs/<game>.json (env KILLCLIP_GAME); KILLCLIP_PLAYER overrides player_name")
     p.add_argument("--config", help="explicit config file instead of --game")
+    p.add_argument("--encoder", help="force a video encoder, e.g. h264_videotoolbox (env KILLCLIP_ENCODER)")
     p.add_argument("--grade", default="none", choices=["none", "natural", "vivid"],
                    help="colour of cut clips and montages: none (as recorded, HDR tags kept), "
                         "natural (HDR tone-mapped to SDR), vivid (tone map plus a little saturation)")
@@ -234,6 +283,8 @@ def main(argv=None):
     s.add_argument("--streak-gap", type=float, default=6.0,
                    help="kills this close (s) form a streak that plays on through, one beat per kill; 0 = every kill solo")
 
+    sub.add_parser("doctor", help="check this machine has everything the tool needs")
+
     s = sub.add_parser("captions", help="read the game's own on-screen subtitles into an SRT")
     s.add_argument("video"); s.add_argument("--out")
 
@@ -257,6 +308,8 @@ def main(argv=None):
     s.add_argument("--around", type=float)
 
     a = p.parse_args(argv)
+    if getattr(a, "encoder", None):
+        os.environ["KILLCLIP_ENCODER"] = a.encoder
     logfile = logmod.setup(a.verbose, a.log_dir)
     path = a.config or detect.config_path(a.game)
     if not os.path.exists(path):

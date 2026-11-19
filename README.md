@@ -2,7 +2,7 @@
 
 **Find your kills in raw console gameplay and turn them into clips, editor timelines and beat-synced montages. Locally, for free.**
 
-![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue) ![Platform: macOS](https://img.shields.io/badge/platform-macOS-lightgrey) ![License: MIT](https://img.shields.io/badge/license-MIT-green)
+![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue) ![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Linux-lightgrey) ![License: MIT](https://img.shields.io/badge/license-MIT-green)
 
 Console recordings (PlayStation, Xbox) carry no game events, only pixels. killclip reads the HUD the way you do: it watches the kill banner and the kill feed, decides which rows are yours, and stamps each kill to the frame. From there it cuts clips, writes an EDL for your editor, and builds montages where every kill lands on a beat of your track.
 
@@ -31,7 +31,8 @@ Validated against the games' own numbers (end-of-match scoreboards): 90 of 93 ki
 
 ## Requirements
 
-- macOS with Apple silicon (encoding uses VideoToolbox; a software encoder for Linux and Windows is on the roadmap)
+- macOS or Linux. Encoding uses libx264 by default; `--encoder h264_videotoolbox` or
+  `$KILLCLIP_ENCODER` picks another, and `killclip doctor` reports what this machine has
 - `ffmpeg` and `tesseract` on the PATH (`brew install ffmpeg tesseract`)
 - Python 3.11 or newer, or [`uv`](https://docs.astral.sh/uv/)
 
@@ -68,6 +69,7 @@ killclip beatsync --events events.json --music track.mp3 --style freeze --out mo
 | `beatsync` | beat-synced montage from one or more events files |
 | `captions` | read the game's own on-screen subtitles into an SRT |
 | `short` | compose a finished 9:16 short with a title and captions |
+| `doctor` | check this machine has everything the tool needs, in one pasteable block |
 | `frames`, `template`, `test` | calibration: dump frames with the regions drawn, cut a template, inspect one moment |
 
 Global: `--grade none|natural|vivid` (colour, see below), `-v` for debug on the console. Every run writes a full log to `logs/`.
@@ -133,6 +135,22 @@ been a lot gabbing on the shelf with no rusty" where the game's caption read "It
 yeah, we got to chill, no Rusty". Set `caption_region` in the game's config to the strip it prints
 dialogue in. Pass `--srt` to use your own file, or `--no-captions` for none.
 
+## Encoding and decoding
+
+Both run in software, and that is the fast path rather than a fallback. Measured on an M5 Pro, per 5
+seconds of 4K for encoding and 30 seconds at the detector's own 5 fps for decoding:
+
+| operation | hardware | software |
+|---|---|---|
+| encode 4K | `h264_videotoolbox` 40M, 4.30 s | `libx264 veryfast crf 20`, **2.32 s** |
+| decode 4K VP9 | `-hwaccel videotoolbox`, 9.93 s | **3.68 s** |
+| decode 1080p H.264 | `-hwaccel videotoolbox`, 6.01 s | **0.96 s** |
+
+The chip has no VP9 decoder, and for H.264 moving frames out of the media engine into system memory
+costs more than decoding them across every core. So `--encoder` / `$KILLCLIP_ENCODER` and
+`$KILLCLIP_HWACCEL` exist for anyone who wants the hardware path back, and neither is the default.
+Run `killclip doctor` to see what was chosen and why.
+
 ## Colour
 
 Console recordings are HDR (10-bit PQ, BT.2020). With the default `--grade none` every output keeps the pixels as recorded and carries the HDR tags, so macOS, iOS and YouTube show it the way the game looked. `--grade natural` tone-maps to SDR through a generated 3D LUT for players that cannot show HDR; `--grade vivid` adds saturation on top.
@@ -174,10 +192,17 @@ To validate a whole match, compare the detected count with your row's Final Hits
 ## Roadmap
 
 - Automatic name-template calibration from a first recording
-- Software encoder fallback for Linux and Windows
 - Menu-driven command line with a URL as input
 - Model-assisted verification and victim names (a local Qwen3-VL bake-off lives in `tools/`)
 
 ## License
 
-MIT. See `LICENSE`.
+MIT for the code. See `LICENSE`.
+
+Bundled third-party assets, each under its own licence and shipped unmodified:
+
+- **Anton** (titles) and **Liberation Sans** (captions), SIL Open Font License 1.1, licences in
+  `killclip/assets/fonts/`.
+- **AudioSet** class list, CC BY 4.0, Google.
+- **PANNs** MobileNetV1 sound tagger: code adapted from Kong et al. (MIT), weights downloaded on first
+  use from Zenodo record 3987831 under CC BY 4.0.

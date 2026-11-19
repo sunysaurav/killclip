@@ -6,6 +6,8 @@ import subprocess
 import cv2
 import numpy as np
 
+from . import ocr
+
 log = logging.getLogger("killclip.feed")
 
 
@@ -110,11 +112,8 @@ def victim_text(feed, row, name_tmpl, upscale=3):
 def ocr_words(img):
     """Single-line OCR: (joined words, lowest word confidence), keeping words of 3+ characters."""
     _, png = cv2.imencode(".png", img)
-    tsv = subprocess.run(["tesseract", "stdin", "stdout", "--psm", "7", "-l", "eng", "tsv"],
-                         input=png.tobytes(), capture_output=True).stdout.decode("utf-8", "replace")
     words = []
-    for line in tsv.splitlines()[1:]:
-        c = line.split("\t")
+    for c in ocr.tsv(png.tobytes(), psm=7):
         if len(c) >= 12 and c[0] == "5":
             text, conf = clean(c[11].strip()), float(c[10])
             if len(re.sub(r"[^\w]", "", text)) >= 3 and conf >= 40:

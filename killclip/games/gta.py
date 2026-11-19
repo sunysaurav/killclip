@@ -23,6 +23,7 @@ log = logging.getLogger("killclip.games.gta")
 DEFAULTS = {
     "sound_threshold": 0.3,      # how strong a sound must be, relative to this recording, to count
     "sound_merge": 10.0,         # sounds this close are one moment
+    "sound_extend_gap": 45.0,    # how long sirens may keep an incident open after the shooting stops
     "sound_limit": None,         # keep only the N strongest moments (None: all above threshold)
     "sound_weights": {"gunfire": 1.0, "explosion": 1.0, "crash": 0.9,
                       "siren": 0.8, "engine": 0.4, "scream": 0.8},
@@ -47,7 +48,8 @@ def candidates(video, cfg, info):
         log.warning("no audio in %s: nothing to detect", video)
         return []
     found = sound.moments(heard, weights=cfg["sound_weights"], threshold=cfg["sound_threshold"],
-                          merge=cfg["sound_merge"], limit=cfg["sound_limit"])
+                          merge=cfg["sound_merge"], limit=cfg["sound_limit"],
+                          extend_gap=cfg["sound_extend_gap"])
     events = []
     for m in sorted(found, key=lambda m: m["t"]):
         events.append({"t": round(m["t"], 2), "end": round(m["end"], 2), "kills": 1, "victims": [],

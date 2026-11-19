@@ -18,7 +18,7 @@ import subprocess
 import cv2
 import numpy as np
 
-from . import media
+from . import media, ocr
 
 log = logging.getLogger("killclip.captions")
 
@@ -38,11 +38,8 @@ def _ocr(img, threshold):
         _, _, w, h, area = st[i]
         if 10 <= h <= 80 and 2 <= w <= 250 and area >= 25:      # letter-sized blobs only
             keep[lab == i] = 255
-    r = subprocess.run(["tesseract", "-", "-", "--psm", "7", "tsv"],
-                       input=cv2.imencode(".png", 255 - keep)[1].tobytes(), capture_output=True)
     words, confs = [], []
-    for line in r.stdout.decode(errors="ignore").splitlines()[1:]:
-        p = line.split("\t")
+    for p in ocr.tsv(cv2.imencode(".png", 255 - keep)[1].tobytes(), psm=7):
         if len(p) >= 12 and p[11].strip():
             try:
                 conf = float(p[10])
@@ -129,6 +126,7 @@ def write_srt(cues_, path):
 
 
 def from_video(video, region, out=None, step=0.5, calib_height=None):
+    ocr.require()
     c = cues(read(video, region, step, calib_height), step)
     log.info("captions: %d lines from the game's own subtitles", len(c))
     for a, b, text in c:

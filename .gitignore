@@ -45,3 +45,6 @@ calib/marvel-rivals/feed-portraits/smooth-sheet.png
 
 # context exports (contain conversation history)
 handover*.md
+
+# fetched for experiments only
+/private/
