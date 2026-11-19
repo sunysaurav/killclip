@@ -17,7 +17,7 @@ import subprocess
 
 import numpy as np
 
-from . import panns
+from . import panns, progress
 
 log = logging.getLogger("killclip.sound")
 
@@ -97,6 +97,7 @@ def listen(video, groups=None):
 
     for chunk in read_audio(video):
         total += chunk.size
+        progress.step("listen", total / sr)
         buf = np.concatenate([buf, chunk])
         windows = []
         while (s + 1) * sr + half <= start + buf.size:

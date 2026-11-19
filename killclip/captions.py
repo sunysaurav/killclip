@@ -18,7 +18,7 @@ import subprocess
 import cv2
 import numpy as np
 
-from . import media, ocr
+from . import media, ocr, progress
 
 log = logging.getLogger("killclip.captions")
 
@@ -82,6 +82,7 @@ def read(video, region, step=0.5, calib_height=None):
     out = []
     # stop short of the final frame: seeking past it returns nothing to decode
     for t in np.arange(0.0, max(0.0, info["duration"] - 1.0 / max(info["fps"], 1)), step):
+        progress.step("captions", float(t), info["duration"])
         try:
             img = media.grab_crop(video, float(t), region, info["width"], info["height"], calib_height)
         except Exception as e:

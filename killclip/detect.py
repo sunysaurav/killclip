@@ -5,7 +5,7 @@ import logging
 import os
 import time
 
-from . import audio, games, media, ocr as ocrmod
+from . import audio, games, media, ocr as ocrmod, progress
 
 log = logging.getLogger("killclip.detect")
 from .paths import HOME as ROOT
@@ -90,6 +90,8 @@ def scan(video, cfg, info, ocr=True):
     t0 = time.perf_counter()
     for n, (t, crop) in enumerate(media.iter_crops(video, region, cfg["scan_fps"], info["width"], info["height"],
                                                    calib_height=cfg["calib_height"])):
+        if n % cfg["scan_fps"] == 0:
+            progress.step("scan", t, info["duration"], kills=len(det.events))
         if n and n % (cfg["scan_fps"] * 120) == 0:
             log.info("  scanned %6.0fs / %.0fs (%.0fs elapsed, %d kills so far)",
                      t, info["duration"], time.perf_counter() - t0, len(det.events))

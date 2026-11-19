@@ -48,3 +48,6 @@ handover*.md
 
 # fetched for experiments only
 /private/
+
+# UI workspace (projects, proxies, jobs)
+work/

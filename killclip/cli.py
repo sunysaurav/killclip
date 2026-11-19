@@ -144,6 +144,12 @@ def cmd_short(a, cfg):
     print(f"{out}  ({len(cues)} caption lines, title {a.title!r})")
 
 
+def cmd_ui(a, cfg):
+    """Serve the browser UI. Everything it runs happens in a child process, one job at a time."""
+    from .web import serve
+    serve(a.host, a.port, open_browser=not a.no_open)
+
+
 def cmd_doctor(a, cfg):
     """Everything this machine can and cannot do, in one pasteable block."""
     import shutil
@@ -284,6 +290,10 @@ def main(argv=None):
                    help="kills this close (s) form a streak that plays on through, one beat per kill; 0 = every kill solo")
 
     sub.add_parser("doctor", help="check this machine has everything the tool needs")
+
+    s = sub.add_parser("ui", help="open the browser UI")
+    s.add_argument("--host", default="127.0.0.1"); s.add_argument("--port", type=int, default=8765)
+    s.add_argument("--no-open", action="store_true", help="do not open a browser window")
 
     s = sub.add_parser("captions", help="read the game's own on-screen subtitles into an SRT")
     s.add_argument("video"); s.add_argument("--out")

@@ -19,7 +19,7 @@ import tempfile
 import numpy as np
 from scipy.signal import correlate, stft
 
-from . import grade as grading, media, paths
+from . import grade as grading, media, paths, progress
 from . import encode
 from .cut import bitrate_for
 
@@ -255,6 +255,7 @@ def build(video, events, music, out, beats_per_kill=4, kill_at=None, pattern=Non
                         grading.filters(info, grade), grading.tags(info, grade), grading.stamp(info, grade), venc)
             done += frames
             parts.append(p)
+            progress.step("render", n + 1, len(slots))
             log.info("slot %2d: %d kill%s at %s on beats %s; parts %s  [%s]", n, len(s["kills"]), "s" if len(s["kills"]) > 1 else "",
                      " ".join(f"{k:.2f}s" for k, _ in s["kills"]), " ".join(f"{b:.2f}s" for _, b in s["kills"]),
                      " ".join(f"hold {d:.2f}s" if src == 0 else f"{src:.2f}s@{src / d:.2f}x" for src, d in s["parts"]),

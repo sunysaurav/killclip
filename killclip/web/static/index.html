@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>killclip</title>
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<header>
+  <h1>killclip</h1>
+  <nav id="crumbs"></nav>
+  <div id="caps" class="caps"></div>
+</header>
+
+<main id="view"></main>
+
+<aside id="jobs" class="jobs" hidden>
+  <div class="jobs-head"><strong>Running</strong><button id="jobs-close" class="link">hide</button></div>
+  <div id="jobs-list"></div>
+  <pre id="joblog" class="joblog"></pre>
+</aside>
+
+<template id="tpl-library">
+  <section class="split">
+    <div class="pane">
+      <h2>Pick a recording</h2>
+      <div class="roots" id="roots"></div>
+      <div class="crumb" id="browse-path"></div>
+      <ul class="files" id="files"></ul>
+    </div>
+    <div class="pane">
+      <h2>Projects</h2>
+      <div class="cards" id="projects"></div>
+    </div>
+  </section>
+</template>
+
+<template id="tpl-newproject">
+  <div class="dialog">
+    <h3 id="np-name"></h3>
+    <div class="facts" id="np-facts"></div>
+    <label>Game <select id="np-game"></select></label>
+    <label>Your in-game name <input id="np-player" placeholder="leave blank to use the config's"></label>
+    <div class="row">
+      <button id="np-go" class="primary">Create and detect</button>
+      <button id="np-cancel" class="link">cancel</button>
+    </div>
+    <p class="hint" id="np-hint"></p>
+  </div>
+</template>
+
+<script type="module" src="/static/app.js"></script>
+</body>
+</html>
