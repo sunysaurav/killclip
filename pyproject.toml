@@ -5,7 +5,11 @@ description = "Find your kills in raw console gameplay recordings and cut clips,
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.11"
-dependencies = ["numpy>=1.26", "scipy>=1.11", "opencv-python-headless>=4.9"]
+dependencies = ["numpy>=1.26", "scipy>=1.11", "opencv-python-headless>=4.9", "pillow>=10"]
+
+[project.optional-dependencies]
+# Sound-based detection (games with no kill feed, such as GTA) runs an AudioSet tagger.
+sound = ["torch>=2.2"]
 keywords = ["gaming", "montage", "kill-feed", "ffmpeg", "video"]
 
 [project.scripts]

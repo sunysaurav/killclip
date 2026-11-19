@@ -1,0 +1,25 @@
+{
+  "player_name": "",
+  "detector": "gta",
+  "sound_threshold": 0.3,
+  "sound_merge": 10.0,
+  "sound_weights": {
+    "gunfire": 1.0,
+    "explosion": 1.0,
+    "crash": 0.9,
+    "siren": 0.8,
+    "engine": 0.4,
+    "scream": 0.8
+  },
+  "scan_fps": 5,
+  "merge_gap": 8.0,
+  "clip_pre": 6.0,
+  "clip_post": 4.0,
+  "caption_region": [
+    0.18,
+    0.845,
+    0.82,
+    0.935
+  ],
+  "caption_step": 0.5
+}

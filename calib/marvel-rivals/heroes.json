@@ -1,0 +1,277 @@
+{
+ "source": "https://rivalskins.com/assets/hero-icons-avatars/",
+ "heroes": {
+  "adam-warlock": {
+   "id": "1046",
+   "portraits": [
+    "adam-warlock_avatar.png"
+   ]
+  },
+  "angela": {
+   "id": "1056",
+   "portraits": [
+    "angela_avatar.png"
+   ]
+  },
+  "black-panther": {
+   "id": "1026",
+   "portraits": [
+    "black-panther_avatar.png"
+   ]
+  },
+  "black-widow": {
+   "id": "1033",
+   "portraits": [
+    "black-widow_avatar.png"
+   ]
+  },
+  "blade": {
+   "id": "1044",
+   "portraits": [
+    "blade_avatar.png"
+   ]
+  },
+  "captain-america": {
+   "id": "1022",
+   "portraits": [
+    "captain-america_avatar.png"
+   ]
+  },
+  "cloak-and-dagger": {
+   "id": "1025",
+   "portraits": [
+    "cloak-and-dagger_avatar.png",
+    "img_squarehead_10250011_avatar.png",
+    "img_squarehead_10250012_avatar.png"
+   ]
+  },
+  "daredevil": {
+   "id": "1055",
+   "portraits": [
+    "daredevil_avatar.png"
+   ]
+  },
+  "doctor-strange": {
+   "id": "1018",
+   "portraits": [
+    "doctor-strange_avatar.png"
+   ]
+  },
+  "emma-frost": {
+   "id": "1053",
+   "portraits": [
+    "emma-frost_avatar.png",
+    "img_squarehead_10530011_avatar.png"
+   ]
+  },
+  "gambit": {
+   "id": "1058",
+   "portraits": [
+    "gambit_avatar.png"
+   ]
+  },
+  "groot": {
+   "id": "1027",
+   "portraits": [
+    "groot_avatar.png"
+   ]
+  },
+  "hawkeye": {
+   "id": "1021",
+   "portraits": [
+    "hawkeye_avatar.png"
+   ]
+  },
+  "hela": {
+   "id": "1024",
+   "portraits": [
+    "hela_avatar.png"
+   ]
+  },
+  "hulk": {
+   "id": "1011",
+   "portraits": [
+    "hulk_avatar.png",
+    "img_squarehead_10110010_avatar.png",
+    "img_squarehead_10110011_avatar.png",
+    "img_squarehead_10110012_avatar.png"
+   ]
+  },
+  "human-torch": {
+   "id": "1017",
+   "portraits": [
+    "human-torch_avatar.png"
+   ]
+  },
+  "invisible-woman": {
+   "id": "1050",
+   "portraits": [
+    "invisible-woman_avatar.png"
+   ]
+  },
+  "iron-fist": {
+   "id": "1052",
+   "portraits": [
+    "iron-fist_avatar.png"
+   ]
+  },
+  "iron-man": {
+   "id": "1034",
+   "portraits": [
+    "iron-man_avatar.png"
+   ]
+  },
+  "jeff-the-land-shark": {
+   "id": null,
+   "portraits": [
+    "jeff-the-land-shark_avatar.png"
+   ]
+  },
+  "loki": {
+   "id": "1016",
+   "portraits": [
+    "loki_avatar.png",
+    "img_squarehead_10160011_avatar.png"
+   ]
+  },
+  "luna-snow": {
+   "id": "1031",
+   "portraits": [
+    "luna-snow_avatar.png"
+   ]
+  },
+  "magik": {
+   "id": "1029",
+   "portraits": [
+    "magik_avatar.png",
+    "img_squarehead_10290011_avatar.png"
+   ]
+  },
+  "magneto": {
+   "id": "1037",
+   "portraits": [
+    "magneto_avatar.png"
+   ]
+  },
+  "mantis": {
+   "id": "1020",
+   "portraits": [
+    "mantis_avatar.png"
+   ]
+  },
+  "mister-fantastic": {
+   "id": "1040",
+   "portraits": [
+    "mister-fantastic_avatar.png"
+   ]
+  },
+  "moon-knight": {
+   "id": "1030",
+   "portraits": [
+    "moon-knight_avatar.png"
+   ]
+  },
+  "namor": {
+   "id": "1045",
+   "portraits": [
+    "namor_avatar.png"
+   ]
+  },
+  "peni-parker": {
+   "id": "1042",
+   "portraits": [
+    "peni-parker_avatar.png"
+   ]
+  },
+  "phoenix": {
+   "id": "1054",
+   "portraits": [
+    "phoenix_avatar.png"
+   ]
+  },
+  "psylocke": {
+   "id": null,
+   "portraits": [
+    "psylocke_avatar.png"
+   ]
+  },
+  "rocket-raccoon": {
+   "id": "1023",
+   "portraits": [
+    "rocket-raccoon_avatar.png"
+   ]
+  },
+  "scarlet-witch": {
+   "id": "1038",
+   "portraits": [
+    "scarlet-witch_avatar.png"
+   ]
+  },
+  "spider-man": {
+   "id": "1036",
+   "portraits": [
+    "spider-man_avatar.png"
+   ]
+  },
+  "squirrel-girl": {
+   "id": "1032",
+   "portraits": [
+    "squirrel-girl_avatar.png"
+   ]
+  },
+  "star-lord": {
+   "id": "1043",
+   "portraits": [
+    "star-lord_avatar.png"
+   ]
+  },
+  "storm": {
+   "id": "1015",
+   "portraits": [
+    "storm_avatar.png"
+   ]
+  },
+  "the-punisher": {
+   "id": "1014",
+   "portraits": [
+    "the-punisher_avatar.png"
+   ]
+  },
+  "the-thing": {
+   "id": "1051",
+   "portraits": [
+    "the-thing_avatar.png"
+   ]
+  },
+  "thor": {
+   "id": "1039",
+   "portraits": [
+    "thor_avatar.png"
+   ]
+  },
+  "ultron": {
+   "id": "1028",
+   "portraits": [
+    "ultron_avatar.png"
+   ]
+  },
+  "venom": {
+   "id": "1035",
+   "portraits": [
+    "venom_avatar.png"
+   ]
+  },
+  "winter-soldier": {
+   "id": "1041",
+   "portraits": [
+    "winter-soldier_avatar.png"
+   ]
+  },
+  "wolverine": {
+   "id": null,
+   "portraits": [
+    "wolverine_avatar.png"
+   ]
+  }
+ }
+}

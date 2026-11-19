@@ -30,3 +30,18 @@ tests/fixture.mp4
 
 # personal, unrelated to the tool
 channel-banner/
+
+# fetched model weights and label lists
+models/
+calib/audio/
+
+# third-party game art fetched for experiments, and large experiment sheets
+calib/marvel-rivals/heroes-assets/
+calib/marvel-rivals/feed-portraits/*-sheet.png
+calib/marvel-rivals/feed-portraits/*-labelled.png
+calib/marvel-rivals/feed-portraits/*dinov3*.png
+calib/marvel-rivals/feed-portraits/raw-vs-tonemapped.png
+calib/marvel-rivals/feed-portraits/smooth-sheet.png
+
+# context exports (contain conversation history)
+handover*.md

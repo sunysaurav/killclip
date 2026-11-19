@@ -66,6 +66,8 @@ killclip beatsync --events events.json --music track.mp3 --style freeze --out mo
 | `cut` | one clip per moment; `--vertical`, `--edl`, `--pre`/`--post` windows, `--only` ids |
 | `montage` | join clips with crossfades |
 | `beatsync` | beat-synced montage from one or more events files |
+| `captions` | read the game's own on-screen subtitles into an SRT |
+| `short` | compose a finished 9:16 short with a title and captions |
 | `frames`, `template`, `test` | calibration: dump frames with the regions drawn, cut a template, inspect one moment |
 
 Global: `--grade none|natural|vivid` (colour, see below), `-v` for debug on the console. Every run writes a full log to `logs/`.
@@ -88,6 +90,48 @@ The tracker assumes a constant tempo, which suits montage music: tempo from the 
 - **Streaks**: kills within `--streak-gap` seconds (default 6) share a slot and land on consecutive beats. `--streak-gap 0` makes every kill solo.
 - **Several recordings**: pass all events files; recordings of the same play (a console saving overlapping clips) are found by the constant offset between their kill times and deduplicated. When the track is shorter than the kill list, streaks are kept first.
 - **Placement**: `--music-start SECONDS` starts the montage at the build-up before a drop; `--bpm` forces the tempo if the tracker picks half or double; `--pattern 0.75:1.25` overrides a style's speeds; `--effect none|punch|flash` mixes looks.
+
+## Games with no kill feed (GTA)
+
+Marvel Rivals and Battlefield print the event on screen. GTA never does: its HUD shows *state* (a
+wanted level, a mission banner), not events. So `--game gta` listens instead. An AudioSet sound
+tagger scores every second for gunfire, explosions, crashes, sirens and screams, and the peaks
+become the moments. Audio only, so no video is decoded: a 7-minute recording is read in 4 seconds,
+an hour in well under a minute.
+
+```sh
+killclip --game gta detect session.webm --out events.json   # moments from the audio
+killclip --game gta cut --events events.json --out clips    # one clip per moment
+```
+
+Scoring is **relative**, which is what makes it work. Raw tagger probabilities on game audio are
+small (in one GTA recording gunfire never passed 0.27), so an absolute threshold finds nothing.
+Each sound is measured against its own usual level in that recording, with a floor so a quiet
+session cannot promote its loudest footstep. `sound_threshold` (default 0.3) is how strong a sound
+must be to start a moment, and `sound_weights` says how much each kind means.
+
+Needs PyTorch, which the core does not: `pip install 'killclip[sound]'`. The tagger is PANNs
+MobileNetV1 (Kong et al., MIT); its weights (23 MB, Zenodo record 3987831, CC BY 4.0) and the
+AudioSet label list download on first use.
+
+## Finished vertical shorts
+
+```sh
+killclip --game gta captions clip.mp4                       # the game's own subtitles -> SRT
+killclip --game gta short clip.mp4 --title "He said he could drive" \
+    --panel-aspect 1.33 --out short.mp4                     # 1080x1920, ready to post
+```
+
+`short` composes the clip for Reels, TikTok or Shorts: the gameplay blurred and darkened as a
+background, the clip itself centred, the title at the top and captions underneath, all placed clear
+of the platform's own buttons (`--platform`). `--panel-aspect 1.33` crops the gameplay sides so it
+fills more of the tall frame; leave it off to keep the whole 16:9 scene.
+
+Captions come from the **game's own on-screen subtitles**, read with OCR, not from transcribing the
+audio. Game dialogue sits under engine noise and music, and on a GTA clip Whisper produced "It's
+been a lot gabbing on the shelf with no rusty" where the game's caption read "It's been a lot,
+yeah, we got to chill, no Rusty". Set `caption_region` in the game's config to the strip it prints
+dialogue in. Pass `--srt` to use your own file, or `--no-captions` for none.
 
 ## Colour
 

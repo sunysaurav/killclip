@@ -70,8 +70,16 @@ def crop_regions(crop, regs, origin, W, H):
 
 
 def scan(video, cfg, info, ocr=True):
-    """Return kill events [{t, kills, victims, source, score}] from one decode of the video."""
+    """Return kill events [{t, kills, victims, source, score}] from one decode of the video.
+
+    A game module that finds its moments some other way (GTA listens to the audio) defines
+    `candidates(video, cfg, info)` instead of a Detector, and that is used in its place."""
     mod = games.load(cfg["detector"])
+    if hasattr(mod, "candidates") and not hasattr(mod, "Detector"):
+        t0 = time.perf_counter()
+        events = mod.candidates(video, cfg, info)
+        log.info("scan: %d events in %.0fs", len(events), time.perf_counter() - t0)
+        return events
     det = mod.Detector(cfg, ocr)
     regs = mod.regions(cfg)
     W, H, _ = media.scaled(info["width"], info["height"], cfg["calib_height"])
@@ -114,20 +122,26 @@ def audio_check(video, cfg, events):
 def moments(events, cfg, duration):
     out = []
     for e in sorted(events, key=lambda e: e["t"]):
+        # An event may span time of its own (a sound moment runs until the gunfire stops);
+        # a kill is a single instant and its end is its start.
+        end = float(e.get("end", e["t"]))
         if out and e["t"] - out[-1]["end"] <= cfg["merge_gap"]:
-            out[-1]["end"] = e["t"]
+            out[-1]["end"] = max(out[-1]["end"], end)
             out[-1]["events"].append(e)
         else:
-            out.append({"start": e["t"], "end": e["t"], "events": [e]})
+            out.append({"start": e["t"], "end": end, "events": [e]})
     for i, m in enumerate(out, 1):
         m["id"] = i
         m["kills"] = sum(e["kills"] for e in m["events"])
         m["victims"] = [v for e in m["events"] for v in e["victims"] if v]
         m["sources"] = sorted({e["source"] for e in m["events"]})
+        m["labels"] = sorted({e["label"] for e in m["events"] if e.get("label")})
+        m["score"] = max((e.get("score") or 0) for e in m["events"])
         m["clip_start"] = max(0.0, m["start"] - cfg["clip_pre"])
         m["clip_end"] = min(duration, m["end"] + cfg["clip_post"])
-        log.info("moment #%02d %8.2fs kills=%d %s clip %.2f-%.2f", i, m["start"], m["kills"],
-                 m["victims"], m["clip_start"], m["clip_end"])
+        what = ", ".join(m["labels"]) if m["labels"] else f"kills={m['kills']} {m['victims']}"
+        log.info("moment #%02d %8.2f-%.2fs  %s  clip %.2f-%.2f", i, m["start"], m["end"], what,
+                 m["clip_start"], m["clip_end"])
     return out
 
 

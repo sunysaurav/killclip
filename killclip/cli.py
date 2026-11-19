@@ -9,7 +9,7 @@ import sys
 import cv2
 import numpy as np
 
-from . import audio, beatsync, cut, detect, games, log as logmod, media
+from . import audio, beatsync, captions, cut, detect, games, log as logmod, media, short
 
 log = logging.getLogger("killclip.cli")
 
@@ -119,6 +119,31 @@ def cmd_beatsync(a, cfg):
     print(f"{kills} kills in {len(slots)} slots on beats at {tempo:.0f} BPM, style {a.style} -> {a.out}")
 
 
+def cmd_captions(a, cfg):
+    """Read the game's own on-screen subtitles out of a clip and write an SRT."""
+    region = cfg.get("caption_region")
+    if not region:
+        sys.exit(f"no caption_region in the config for {cfg['detector']}")
+    out = a.out or os.path.splitext(a.video)[0] + ".srt"
+    captions.from_video(a.video, region, out, cfg.get("caption_step", 0.5), cfg["calib_height"])
+    print(out)
+
+
+def cmd_short(a, cfg):
+    """Compose a finished 9:16 short: blurred background, the gameplay centred, a title and captions."""
+    cues = []
+    srt = a.srt
+    if srt is None and cfg.get("caption_region") and not a.no_captions:
+        srt = os.path.splitext(a.video)[0] + ".srt"
+        if not os.path.exists(srt):
+            captions.from_video(a.video, cfg["caption_region"], srt, cfg.get("caption_step", 0.5),
+                                cfg["calib_height"])
+    if srt and os.path.exists(srt):
+        cues = short.cues_from_srt(srt)
+    out = short.build(a.video, a.title, cues, a.out, a.platform, dim=a.dim, panel_aspect=a.panel_aspect)
+    print(f"{out}  ({len(cues)} caption lines, title {a.title!r})")
+
+
 def cmd_audio_ref(a, cfg):
     out = a.out or cfg["audio_ref"]
     if not out:
@@ -208,6 +233,20 @@ def main(argv=None):
     s.add_argument("--bpm", type=float, help="force the tempo if the tracker picks a half or double tempo")
     s.add_argument("--streak-gap", type=float, default=6.0,
                    help="kills this close (s) form a streak that plays on through, one beat per kill; 0 = every kill solo")
+
+    s = sub.add_parser("captions", help="read the game's own on-screen subtitles into an SRT")
+    s.add_argument("video"); s.add_argument("--out")
+
+    s = sub.add_parser("short", help="compose a finished 9:16 short with a title and captions")
+    s.add_argument("video"); s.add_argument("--title", default="")
+    s.add_argument("--out", required=True)
+    s.add_argument("--srt", help="captions to burn in (default: read the game's own)")
+    s.add_argument("--no-captions", action="store_true")
+    s.add_argument("--platform", default="reels", choices=["reels", "tiktok", "shorts", "all", "none"],
+                   help="keep the title and captions clear of this platform's own buttons")
+    s.add_argument("--panel-aspect", type=float,
+                   help="crop the gameplay to this aspect so it fills more of the frame, e.g. 1.33")
+    s.add_argument("--dim", type=float, default=0.2, help="how far to darken the blurred background")
 
     s = sub.add_parser("audio-ref", help="save a sound starting at --start as the reference sting")
     s.add_argument("video"); s.add_argument("--start", type=float, required=True)
