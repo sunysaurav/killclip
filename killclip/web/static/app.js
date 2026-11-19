@@ -1,8 +1,11 @@
-// The whole UI. No build step: the server is the state, and the event stream says when to re-read it.
-const $ = (sel, root = document) => root.querySelector(sel);
+// The UI. No build step: the server is the state, and the event stream says when to re-read it.
+// Library, project and job chrome live here; the trim, short and montage screens are in screens.js.
+import { screenMontage, screenShort, screenTrim } from "./screens.js";
+
+export const $ = (sel, root = document) => root.querySelector(sel);
 const view = $("#view");
 
-const api = {
+export const api = {
   async get(path) { return this.go("GET", path); },
   async post(path, body) { return this.go("POST", path, body); },
   async put(path, body) { return this.go("PUT", path, body); },
@@ -19,9 +22,9 @@ const api = {
   },
 };
 
-const state = { server: null, jobs: new Map(), openJob: null };
+export const state = { server: null, jobs: new Map(), openJob: null };
 
-const fmt = {
+export const fmt = {
   time(s) {
     if (s == null) return "";
     const m = Math.floor(s / 60), r = Math.floor(s % 60);
@@ -57,7 +60,7 @@ function crumbs(parts) {
 // ---- jobs panel ---------------------------------------------------------------------------
 function renderJobs() {
   const live = [...state.jobs.values()].filter((j) => j.state === "queued" || j.state === "running");
-  const recent = [...state.jobs.values()].slice(0, 6);
+  const recent = [...state.jobs.values()].sort((a, b) => b.created - a.created).slice(0, 6);
   const panel = $("#jobs");
   panel.hidden = recent.length === 0;
   $("#jobs-list").innerHTML = recent.map((j) => {
@@ -86,7 +89,7 @@ async function showJobLog(jid) {
 
 // ---- screens ------------------------------------------------------------------------------
 async function screenLibrary() {
-  crumbs([{ label: "Library" }]);
+  crumbs([]);
   view.innerHTML = "";
   view.append($("#tpl-library").content.cloneNode(true));
   renderProjects();
@@ -172,26 +175,45 @@ function momentCard(pid, m) {
   const label = m.labels?.length ? m.labels.join(", ")
     : `${m.kills} kill${m.kills === 1 ? "" : "s"}${m.victims?.length ? " · " + m.victims.join(", ") : ""}`;
   return `<div class="moment ${m.keep ? "" : "dropped"}" data-moment="${m.id}">
-    <img loading="lazy" src="/media/thumb/${pid}/m${String(m.id).padStart(2, "0")}.jpg"
-         onerror="this.style.visibility='hidden'">
+    <img loading="lazy" data-go="#/p/${pid}/m/${m.id}" style="cursor:pointer" title="trim this moment"
+         src="/media/thumb/${pid}/m${String(m.id).padStart(2, "0")}.jpg" onerror="this.style.visibility='hidden'">
     <div class="meta">
       <span class="t">#${m.id} · ${fmt.time(m.start)}${m.end > m.start ? "–" + fmt.time(m.end) : ""}</span>
       <span class="l">${label}</span>
       <span class="l">clip ${fmt.time(m.clip_start)}–${fmt.time(m.clip_end)}${m.score != null ? " · score " + m.score : ""}</span>
       <div class="row" style="margin-top:4px">
         <button class="chip" data-keep="${m.id}" data-pid="${pid}">${m.keep ? "drop" : "keep"}</button>
+        <button class="chip" data-go="#/p/${pid}/m/${m.id}">trim</button>
       </div>
     </div></div>`;
 }
 
 // ---- routing ------------------------------------------------------------------------------
-function go(hash) { location.hash = hash; }
+export function go(hash) { location.hash = hash; }
+
+export function waitForJob(jid) {
+  return new Promise((resolve) => {
+    const check = async () => {
+      const { job } = await api.get(`/api/jobs/${jid}`);
+      if (["done", "failed", "cancelled"].includes(job.state)) return resolve(job);
+      setTimeout(check, 1000);
+    };
+    check();
+  });
+}
 
 async function route() {
   const h = location.hash || "#/";
+  const [path, query] = h.split("?");
+  const q = new URLSearchParams(query || "");
+  for (const [id, re] of [["nav-lib", /^#\/(p\/|$)/], ["nav-short", /^#\/short/], ["nav-montage", /^#\/montage/]])
+    $("#" + id).classList.toggle("on", re.test(path));
   try {
-    const p = h.match(/^#\/p\/([^/]+)$/);
-    if (p) return await screenProject(p[1]);
+    let m;
+    if ((m = path.match(/^#\/p\/([^/]+)\/m\/([^/]+)$/))) { crumbs([{ label: "Library", href: "#/" }, { label: m[1], href: `#/p/${m[1]}` }, { label: `moment ${m[2]}` }]); return await screenTrim(m[1], m[2]); }
+    if ((m = path.match(/^#\/p\/([^/]+)$/))) return await screenProject(m[1]);
+    if (path === "#/short") { crumbs([]); return await screenShort(q.get("clip")); }
+    if (path === "#/montage") { crumbs([]); return await screenMontage(); }
     return await screenLibrary();
   } catch (e) {
     view.innerHTML = `<p class="empty">${e.message}</p>`;
@@ -226,7 +248,14 @@ function listen() {
     pre.textContent += (pre.textContent ? "\n" : "") + line;
     pre.scrollTop = 1e9;
   });
-  es.addEventListener("project", async () => { await refresh(); route(); });
+  // A finished job changes a project. Only the library and that project's page are re-rendered:
+  // trim, short and montage hold the user's unsaved state (captions, title, handles) and must not reset.
+  es.addEventListener("project", async (e) => {
+    const { id } = JSON.parse(e.data);
+    await refresh();
+    const h = (location.hash || "#/").split("?")[0];
+    if (h === "#/" || h === `#/p/${id}`) route();
+  });
   es.onerror = () => {};   // EventSource reconnects on its own
 }
 

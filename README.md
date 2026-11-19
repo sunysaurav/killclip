@@ -58,6 +58,22 @@ killclip beatsync --events events.json --music track.mp3 --style freeze --out mo
 
 `--game` picks `configs/<game>.json` (`marvel-rivals`, `battlefield-6`, `battlefield-6-mp`); `KILLCLIP_GAME` and `KILLCLIP_PLAYER` set the game and name for a shell.
 
+## Browser UI
+
+```sh
+killclip ui                     # opens http://127.0.0.1:8765/
+```
+
+The whole pipeline in a local page, no build step and no extra dependencies:
+
+- **Library**: pick a recording, choose the game, detect with live progress.
+- **Moments**: thumbnails of every moment found; keep or drop each one, cut the kept ones.
+- **Trim**: a filmstrip of the moment with two handles and the detected kills marked; cut with a colour grade.
+- **Short**: a 9:16 preview with the platform's safe zones shaded, a title, the game's own captions read into an editable table, then render.
+- **Montage**: tick projects, pick a track, *Plan* shows the tempo and which kill lands on which beat in seconds, then render.
+
+Each job runs in its own process and can be cancelled. Projects live in `work/projects/<id>/`; the detector's `events.json` is never edited, your choices go to `edits.json` beside it. The page only ever shows generated SDR files, because browsers cannot play the console's 10-bit HDR recordings. The server listens on localhost only and refuses other hosts and cross-site requests.
+
 ## Commands
 
 | command | purpose |
@@ -70,6 +86,7 @@ killclip beatsync --events events.json --music track.mp3 --style freeze --out mo
 | `captions` | read the game's own on-screen subtitles into an SRT |
 | `short` | compose a finished 9:16 short with a title and captions |
 | `doctor` | check this machine has everything the tool needs, in one pasteable block |
+| `ui` | the browser UI; `--port`, `--no-open` |
 | `frames`, `template`, `test` | calibration: dump frames with the regions drawn, cut a template, inspect one moment |
 
 Global: `--grade none|natural|vivid` (colour, see below), `-v` for debug on the console. Every run writes a full log to `logs/`.
@@ -174,16 +191,18 @@ A new game is one module, `killclip/games/<game>.py`, defining `DEFAULTS`, `TEMP
 ```
 killclip/          the pipeline: media, detect, feed, cut, beatsync, grade, cli
 killclip/games/    one module per game
+killclip/web/      the browser UI: stdlib HTTP server, job runner, static page
 configs/           one JSON per game or HUD mode
 calib/             templates cut from real frames
 tools/             calibration harvesters, the case suite, OCR and VLM bake-off scripts
-tests/             synthetic-clip pipeline test
+tests/             synthetic-clip pipeline and web UI tests
 ```
 
 ## Tests
 
 ```sh
 .venv/bin/python tests/test_pipeline.py    # synthetic clip: detection, cutting, montage, EDL
+.venv/bin/python tests/test_web.py         # the UI's server: real jobs, event stream, trim, plan, montage
 .venv/bin/python tools/check_cases.py      # short real cuts with known kill counts
 ```
 

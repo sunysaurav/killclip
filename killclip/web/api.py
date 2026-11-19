@@ -157,3 +157,88 @@ def media_thumb(req, pid, name):
         raise HttpError(404, "not generated yet")
     req.handler.file(path, "image/jpeg")
     return True
+
+
+# ---- trim, short and montage support --------------------------------------------------------
+import hashlib  # noqa: E402
+
+from . import preview  # noqa: E402
+
+STRIP_PAD = 15.0          # the strip reaches this far past the clip, so a handle can be dragged outward
+
+
+@api.get("/api/projects/:pid/moments/:mid/strip")
+def moment_strip(req, pid, mid):
+    """The filmstrip window for one moment: where it starts and ends, and how many frames it holds."""
+    p = _project(pid)
+    m = next((m for m in store.moments(pid) if str(m["id"]) == str(mid)), None)
+    if not m:
+        raise HttpError(404, f"no moment {mid}")
+    dur = p.get("info", {}).get("duration") or media.probe(p["video"])["duration"]
+    t0 = max(0.0, (m["clip_start"] or m["start"]) - STRIP_PAD)
+    t1 = min(dur, (m["clip_end"] or m["end"]) + STRIP_PAD)
+    out = os.path.join(store.project_dir(pid), "strips", f"m{int(mid):02d}-{t0:.1f}-{t1:.1f}.jpg")
+    path, n = preview.filmstrip(p["video"], t0, t1, out)
+    return {"url": f"/media/file?path={path}", "t0": t0, "t1": t1, "frames": n,
+            "frame_w": preview.STRIP_W, "moment": m}
+
+
+@api.get("/api/still")
+def still(req):
+    """A tone-mapped frame from any allowed video, for the layout preview."""
+    path = _checked(req.query.get("path"))
+    t = float(req.query.get("t") or 1.0)
+    out = os.path.join(store.work(), "stills", f"{hashlib.sha1(path.encode()).hexdigest()[:12]}-{t:.2f}.jpg")
+    preview.still(path, t, out)
+    req.handler.file(out, "image/jpeg")
+    return True
+
+
+@api.get("/api/clips")
+def all_clips(req):
+    """Every cut clip across projects, for the short composer's source picker."""
+    out = []
+    for p in store.all_projects():
+        for c in store.artifacts(p["id"]).get("clips", []):
+            if c["name"].endswith(".mp4"):
+                out.append(dict(c, project=p["id"], game=p["game"]))
+    return out
+
+
+def _kept_events(pid):
+    """The kill events of a project's kept moments, each tagged with its recording."""
+    p = _project(pid)
+    ev = store.read_json(os.path.join(store.project_dir(pid), "events.json"), {})
+    keep = {str(m["id"]) for m in store.moments(pid) if m["keep"]}
+    return [dict(e, video=p["video"]) for m in ev.get("moments", []) if str(m.get("id")) in keep
+            for e in m.get("events", [])]
+
+
+@api.post("/api/plan")
+def plan_montage(req):
+    """A beat-synced montage's plan without rendering any of it: the tempo, which kill lands on which
+    beat, and what did not fit. Seconds, where the render is minutes."""
+    b = req.body
+    music = _checked(b.get("music"))
+    events = [e for pid in b.get("projects", []) for e in _kept_events(pid)]
+    if not events:
+        raise HttpError(400, "no kept moments in the selected projects")
+    style = b.get("style", "slowmo")
+    st = dict(beatsync.STYLES[style])
+    if b.get("effect") not in (None, "preset"):
+        st["effect"] = b["effect"]
+    kill_at = b.get("kill_at") or st["kill_at"]
+    times, tempo = beatsync.beats(music, bpm=b.get("bpm"))
+    start_beat = int(b.get("start_beat") or 0)
+    if b.get("music_start") is not None:
+        import numpy as np
+        start_beat = int(np.searchsorted(times, float(b["music_start"])))
+    slots = beatsync.plan(events, times, int(b.get("beats_per_kill", 4)), kill_at, st, start_beat,
+                          float(b.get("streak_gap", 6.0)))
+    used = sum(len(s["kills"]) for s in slots)
+    length = (slots[-1]["end"] - slots[0]["start"]) if slots else 0
+    return {"tempo": round(tempo, 2), "beats": len(times), "kills": len(events), "used": used,
+            "unused": len(events) - used, "length": round(length, 1),
+            "slots": [{"start": round(s["start"], 2), "end": round(s["end"], 2),
+                       "kills": [round(k, 2) for k, _ in s["kills"]],
+                       "video": os.path.basename(s["video"] or "")} for s in slots]}

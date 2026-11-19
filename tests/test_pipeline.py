@@ -82,6 +82,13 @@ def main():
     text = open(edl).read()
     assert text.count("FROM CLIP NAME") == 3 and "00:00:04:00 00:00:17:00" in text, text
 
+    # a short's title must be big enough to read on a phone: at least 30% of the frame wide
+    from killclip import fonts, short
+    png = short.text_png(os.path.join(tmp, "title.png"), "HE SAID HE COULD DRIVE", fonts.resolve("display", 96), 300)
+    from PIL import Image
+    x0, _, x1, _ = Image.open(png).getchannel("A").getbbox()
+    assert (x1 - x0) >= 0.30 * short.W, (x0, x1)
+
     print("OK: all checks passed;", tmp)
 
 

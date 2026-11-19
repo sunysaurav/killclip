@@ -103,7 +103,9 @@ def cues(samples, step=0.5, hold=0.6):
         if out and _similar(out[-1]["text"], text) >= SAME and t - out[-1]["end"] <= step * 3:
             c = out[-1]
             c["end"] = t
-            if conf > c["conf"]:
+            # Prefer the reading that caught the most words. Confidence is averaged per word, so a
+            # partial read ("It's been a lot, to chill") can outscore the full line it was cut from.
+            if (len(text.split()), conf) > (len(c["text"].split()), c["conf"]):
                 c["text"], c["conf"] = text, conf
         else:
             out.append({"start": t, "end": t, "text": text, "conf": conf})

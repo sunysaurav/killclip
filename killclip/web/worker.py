@@ -112,8 +112,22 @@ def do_short(job, project, cfg, args):
 def do_beatsync(job, project, cfg, args):
     out_dir = os.path.join(os.getcwd(), "montage")
     os.makedirs(out_dir, exist_ok=True)
-    dst = args.get("out") or os.path.join(out_dir, "beat-montage.mp4")
-    events = beatsync.pool(args["events"])
+    dst = args.get("out") or os.path.join(out_dir, time.strftime("beat-montage-%Y%m%d-%H%M%S.mp4"))
+    files = list(args.get("events") or [])
+    # From the UI: one filtered events file per project, holding only the moments the user kept, so
+    # pool() still deduplicates overlapping recordings and the project's own events.json is untouched.
+    from . import store
+    for pid in args.get("projects") or []:
+        pd = store.project_dir(pid)
+        ev = store.read_json(os.path.join(pd, "events.json"), {})
+        keep = {str(m["id"]) for m in store.moments(pid) if m["keep"]}
+        kept = [m for m in ev.get("moments", []) if str(m.get("id")) in keep]
+        path = os.path.join(out_dir, f".events-{pid}.json")
+        store.write_json(path, dict(ev, moments=kept))
+        files.append(path)
+        if not cfg:
+            cfg = _cfg(store.read_json(os.path.join(pd, "project.json")))
+    events = beatsync.pool(files)
     mod = games.load(cfg["detector"])
     refine = mod.make_refiner(cfg) if hasattr(mod, "make_refiner") else None
     say(t="stage", stage="render")
@@ -144,6 +158,9 @@ def main(job_dir):
     project = store.read_json(os.path.join(store.project_dir(job["project"]), "project.json")) \
         if job.get("project") else {}
     cfg = _cfg(project) if project else {}
+    if not cfg and job.get("args", {}).get("projects"):
+        first = job["args"]["projects"][0]
+        cfg = _cfg(store.read_json(os.path.join(store.project_dir(first), "project.json")))
     fn = HANDLERS.get(job["kind"])
     if not fn:
         say(t="error", message=f"no handler for {job['kind']}")
