@@ -157,8 +157,10 @@ def main():
     assert abs(plan["tempo"] - 120) < 1.5 and plan["kills"] == 2 and plan["used"] == 2, plan
 
     # cut the trimmed moment, list it, and serve part of it the way a <video> element asks
-    job = run_job("cut", pid, {"moments": [got[1]], "grade": "none"})
+    job = run_job("cut", pid, {"moments": [got[1]], "grade": "none", "fcpxml": True})
     clip = job["result"]["clips"][0]
+    timeline = open(job["result"]["timeline"]).read()          # markers come from events.json, not the page
+    assert timeline.count("<marker ") == 1 and 'value="kill"' in timeline, timeline
     assert abs(media.probe(clip)["duration"] - 7.0) < 0.3, media.probe(clip)["duration"]
     _, clips = call("GET", "/api/clips")
     assert os.path.realpath(clip) in [os.path.realpath(c["path"]) for c in clips], clips

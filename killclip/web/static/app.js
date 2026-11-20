@@ -284,7 +284,7 @@ document.addEventListener("click", async (e) => {
     const { moments } = await api.get(`/api/projects/${pid}`);
     const keep = moments.filter((m) => m.keep);
     if (!keep.length) return;
-    await api.post("/api/jobs", { kind: "cut", project: pid, args: { moments: keep, edl: true } });
+    await api.post("/api/jobs", { kind: "cut", project: pid, args: { moments: keep, edl: true, fcpxml: true } });
     return;
   }
   if (t.dataset.job) return showJobLog(t.dataset.job);

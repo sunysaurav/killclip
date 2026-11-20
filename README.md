@@ -52,6 +52,7 @@ From a checkout, `bin/killclip` runs the same CLI from the local `.venv` and use
 ```sh
 killclip --game marvel-rivals detect match.webm               # -> events.json, events.csv
 killclip cut --edl --out clips                                # one clip per moment + clips/kills.edl
+killclip cut --fcpxml --out clips                             # + clips/kills.fcpxml, a marker per kill
 killclip cut --vertical --out shorts                          # 9:16 centre-cropped versions
 killclip beatsync --events events.json --music track.mp3 --style freeze --out montage.mp4
 ```
@@ -74,13 +75,23 @@ The whole pipeline in a local page, no build step and no extra dependencies:
 
 Each job runs in its own process and can be cancelled. Projects live in `work/projects/<id>/`; the detector's `events.json` is never edited, your choices go to `edits.json` beside it. The page only ever shows generated SDR files, because browsers cannot play the console's 10-bit HDR recordings. The server listens on localhost only and refuses other hosts and cross-site requests.
 
+## Editing in DaVinci Resolve
+
+`cut --fcpxml` (or `timeline` for clips you already cut) writes `kills.fcpxml`: the clips end to end on one
+timeline, with a marker on every kill named after its banner (KO, DOUBLE … PENTA) or, for GTA, the sound that
+made the moment. In Resolve, free version included: **File → Import → Timeline**, pick the file. The UI's
+*Cut kept clips* writes one too. The timeline points at the cut MP4s, not the recording, because Resolve cannot
+read the console's WebM. Clips cut with `--grade none` keep their HDR tags; if they look washed out, set the
+project to *DaVinci YRGB Color Managed*, or cut with `--grade natural` for SDR.
+
 ## Commands
 
 | command | purpose |
 |---|---|
 | `probe` | resolution, frame rate, duration, HDR |
 | `detect` | find kills, write `events.json` and `events.csv` |
-| `cut` | one clip per moment; `--vertical`, `--edl`, `--pre`/`--post` windows, `--only` ids |
+| `cut` | one clip per moment; `--vertical`, `--edl`, `--fcpxml`, `--pre`/`--post` windows, `--only` ids |
+| `timeline` | `kills.fcpxml` for clips already cut: the clips end to end, a marker on every kill |
 | `montage` | join clips with crossfades |
 | `beatsync` | beat-synced montage from one or more events files |
 | `captions` | read the game's own on-screen subtitles into an SRT |

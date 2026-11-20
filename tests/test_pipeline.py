@@ -82,6 +82,18 @@ def main():
     text = open(edl).read()
     assert text.count("FROM CLIP NAME") == 3 and "00:00:04:00 00:00:17:00" in text, text
 
+    # a Resolve timeline: both clips end to end, a marker on each kill at its time inside its clip
+    from xml.etree import ElementTree as ET
+    from fractions import Fraction
+    fx = cut.write_fcpxml(os.path.join(tmp, "kills.fcpxml"), [(c1, ms[0]), (c2, ms[1])], "fixture")
+    secs = lambda v: float(Fraction(v.rstrip("s")))  # noqa: E731
+    clips = ET.parse(fx).getroot().findall(".//spine/asset-clip")
+    assert len(clips) == 2 and secs(clips[1].get("offset")) == secs(clips[0].get("duration")), clips
+    for el, m in zip(clips, ms[:2]):
+        got = [secs(mk.get("start")) for mk in el.findall("marker")]
+        want = [e["t"] - m["clip_start"] for e in m["events"]]
+        assert len(got) == len(want) and all(abs(g - w) < 0.05 for g, w in zip(got, want)), (got, want)
+
     # a short's title must be big enough to read on a phone: at least 30% of the frame wide
     from killclip import fonts, short
     png = short.text_png(os.path.join(tmp, "title.png"), "HE SAID HE COULD DRIVE", fonts.resolve("display", 96), 300)

@@ -80,11 +80,18 @@ def do_cut(job, project, cfg, args):
         written.append(dst)
         say(t="artifact", kind="clip", path=dst, moment=m["id"])
         say(t="progress", stage="cut", done=i, total=len(ms))
+    if args.get("fcpxml") and written:
+        timeline = os.path.join(out_dir, "kills.fcpxml")
+        # the page sends moments without their kill events; the markers come from events.json
+        found = {m["id"]: m.get("events", []) for m in detect.read(os.path.join(os.getcwd(), "events.json"))["moments"]}
+        full = [dict(m, events=m.get("events") or found.get(m["id"], [])) for m in ms]
+        cut.write_fcpxml(timeline, list(zip(written, full)), os.path.splitext(os.path.basename(video))[0])
+        say(t="artifact", kind="timeline", path=timeline)
     if args.get("edl"):
         edl = os.path.join(out_dir, "kills.edl")
         cut.write_edl(edl, ms, info["fps"], os.path.basename(video))
         say(t="artifact", kind="edl", path=edl)
-    return {"clips": written}
+    return {"clips": written, "timeline": timeline if args.get("fcpxml") and written else None}
 
 
 def do_captions(job, project, cfg, args):

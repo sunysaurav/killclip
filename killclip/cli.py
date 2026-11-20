@@ -78,6 +78,7 @@ def cmd_cut(a, cfg):
     video = a.video or ev["video"]
     info = media.probe(video)
     os.makedirs(a.out, exist_ok=True)
+    written = []
     for m in ev["moments"]:
         if a.only and m["id"] not in a.only:
             continue
@@ -88,11 +89,34 @@ def cmd_cut(a, cfg):
         name = f"kill_{m['id']:02d}_{int(m['start']):05d}s_x{m['kills']}{'_v' if a.vertical else ''}.mp4"
         out = os.path.join(a.out, name)
         cut.cut_clip(video, m["clip_start"], m["clip_end"], out, info, a.vertical, a.grade)
+        written.append((out, m))
         print(out)
+    if a.fcpxml and written:
+        timeline = os.path.join(a.out, "kills.fcpxml")
+        cut.write_fcpxml(timeline, written, os.path.splitext(os.path.basename(video))[0])
+        print(timeline)
     if a.edl:
         edl = os.path.join(a.out, "kills.edl")
         cut.write_edl(edl, ev["moments"], info["fps"], os.path.basename(video))
         print(edl)
+
+
+def cmd_timeline(a, cfg):
+    """kills.fcpxml for clips already cut: each kill_<id>_*.mp4 in the folder paired with its moment."""
+    ev = detect.read(a.events)
+    by = {m["id"]: m for m in ev["moments"]}
+    items = []
+    for c in sorted(glob.glob(os.path.join(a.clips, "kill_*.mp4"))):
+        if c.endswith("_v.mp4") != a.vertical:
+            continue
+        mid = int(os.path.basename(c).split("_")[1])
+        if mid in by:
+            items.append((c, by[mid]))
+    if not items:
+        sys.exit(f"no kill_*.mp4 clips in {a.clips} match the moments in {a.events}")
+    out = a.out or os.path.join(a.clips, "kills.fcpxml")
+    cut.write_fcpxml(out, items, os.path.splitext(os.path.basename(ev["video"]))[0])
+    print(out)
 
 
 def cmd_montage(a, cfg):
@@ -262,9 +286,17 @@ def main(argv=None):
     s.add_argument("--video"); s.add_argument("--events", default="events.json")
     s.add_argument("--out", default="clips"); s.add_argument("--vertical", action="store_true")
     s.add_argument("--edl", action="store_true", help="also write kills.edl for DaVinci/Premiere")
+    s.add_argument("--fcpxml", action="store_true",
+                   help="also write kills.fcpxml: the clips on a timeline with a marker per kill "
+                        "(DaVinci Resolve: File > Import > Timeline)")
     s.add_argument("--only", type=int, nargs="*", help="moment ids to cut")
     s.add_argument("--pre", type=float, help="seconds before the first kill (overrides the config's clip_pre)")
     s.add_argument("--post", type=float, help="seconds after the last kill (overrides the config's clip_post)")
+
+    s = sub.add_parser("timeline", help="kills.fcpxml for clips already cut, a marker per kill (DaVinci Resolve)")
+    s.add_argument("--events", default="events.json"); s.add_argument("--clips", default="clips")
+    s.add_argument("--out", help="default: <clips>/kills.fcpxml")
+    s.add_argument("--vertical", action="store_true", help="use the _v (9:16) clips")
 
     s = sub.add_parser("montage", help="join clips with crossfades")
     s.add_argument("--clips-dir", default="clips"); s.add_argument("--clips", nargs="*")
